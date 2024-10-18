@@ -1,6 +1,7 @@
 # INMET-Scraping
 ![Static Badge](https://img.shields.io/badge/LICENSE-MIT-blue) ![Static Badge](https://img.shields.io/badge/Status-In%20development-yellow)
 
+
 ## Sobre
 O objetivo deste projeto é coletar dados meteorológicos em tempo real do site do Instituto Nacional de Meteorologia do Brasil (INMET)
 
