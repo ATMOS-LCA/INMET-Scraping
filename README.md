@@ -5,6 +5,7 @@
 ## Sobre
 O objetivo deste projeto é coletar dados meteorológicos em tempo real do site do Instituto Nacional de Meteorologia do Brasil (INMET)
 
+
 ## Tecnologies and requeriments
 * `Python 3`
 * `Selenium`
