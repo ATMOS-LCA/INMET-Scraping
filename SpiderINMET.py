@@ -1,9 +1,3 @@
-# Created by Rafael Silva 
-# E-mail: rafaelps.fis@gmail.com
-# 06/02/2024 UTC
-# Updated in 26/05/2024
-
-
 from selenium import webdriver
 from selenium.common import NoSuchElementException
 from selenium.webdriver.ie.webdriver import WebDriver
@@ -11,15 +5,13 @@ from webdriver_manager.firefox import GeckoDriverManager
 from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.common.by import By
-from Logger import Logger;
+from Logger import Logger
 import time
 from datetime import datetime
 import csv
 from stations import stations
 import os
 import shutil
-
-from multiprocessing import Pool
 
 TODAY = datetime.today().strftime('%Y-%m-%d')
 BASE_URL = 'https://tempo.inmet.gov.br/TabelaEstacoes/'
