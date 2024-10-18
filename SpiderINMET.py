@@ -5,10 +5,13 @@
 
 
 from selenium import webdriver
+from selenium.common import NoSuchElementException
+from selenium.webdriver.ie.webdriver import WebDriver
 from webdriver_manager.firefox import GeckoDriverManager
 from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.common.by import By
+from Logger import Logger;
 import time
 from datetime import datetime
 import csv
@@ -16,74 +19,69 @@ from stations import stations
 import os
 import shutil
 
+from multiprocessing import Pool
 
-def start_browser(show_browser: bool = False):
+TODAY = datetime.today().strftime('%Y-%m-%d')
+BASE_URL = 'https://tempo.inmet.gov.br/TabelaEstacoes/'
+logger = Logger()
+
+def start_browser(show_browser: bool = False) -> WebDriver:
     '''
     This function only starts the browser.
     :param show_browser: a boolean, True for the browser be showed, False for hide it.
     '''
+    logger.log("Starting WebDriver")
     service = Service(GeckoDriverManager().install())
     firefox_options = Options()
-    if show_browser == False:
+    if not show_browser:
         firefox_options.add_argument('--headless')
-    global browser
-    browser = webdriver.Firefox(service=service, options=firefox_options)
+    logger.log("WebDriver started")
+    return webdriver.Firefox(service=service, options=firefox_options)
 
-
-def getting_link(parent: str, child: str):
-    '''
-    Receives a string, compose the link with this string and the parent link and get this link on browser.
-    :param child: an string, the final of the link to be composed.
-    '''
-    composedLink = f'{parent}{child}/'
-    browser.get(composedLink)
-
-
-def verify_data_availability(getLinkAgain: int, limitAttempts: int) -> bool:
-    '''
+def verify_data_availability(browser: WebDriver, station: str, get_link_again: int, limit_attempts: int) -> bool:
+    """
     Verify if the data is available to be downloaded.
-    :param getLinkAgain: time, in seconds to wait before try to access link again.
-    :param limitAttemps: number limit of tries to access the link.
-    '''
+    :param browser: navigator webdriver
+    :param station: station to be verified
+    :param get_link_again: time, in seconds to wait before try to access link again.
+    :param limit_attempts: number limit of tries to access the link.
+    """
     value = False
     element_to_verify = '//thead/tr[1]/th[1]'
     count = 0
-    while value == False:
+    logger.log(f"Verifying data availability for station {station}")
+    while not value:
         try:
             value = browser.find_element(By.XPATH, element_to_verify).is_displayed()
-            print(f'Data available in {count+1} attempt! Keep going!')
-
-        except:
-            print(f'{count} attempt: Data still is unavailable. Trying again...')
+            logger.log(f'Data available in {count + 1} attempt! Keep going!')
+        except NoSuchElementException:
+            logger.log(f'{count} attempt: Data still is unavailable. Trying again...')
             time.sleep(1)
-            if count == getLinkAgain:
-                getting_link(parentLink, station)
-            elif count == limitAttempts:
+            if count == get_link_again:
+                browser.get(f'{BASE_URL}{station}/')
+            elif count == limit_attempts:
+                logger.log(f'Retry limit exceeded')
                 break
-                # CREATE LOG REPORT
             count += 1
-            pass
-        # CREATE VALIDATION USING 'CONTINUE' TO JUMP A STATION IF IT IS UNAVAILABLE
     return value
 
 def read_table(table_name: str, separator: str = ',') -> list:
-    '''
+    """
     receives a .csv file name and its delimiter, in current directory
     and return this file as a list.
-    :param table_name: name of .csv file to be readed.
+    :param table_name: name of .csv file to be read.
     :param separator: the separator of the .csv file. As default is the coma.
-    '''
+    """
+    logger.log(f"Reading table {table_name}")
     data = []
     with open(table_name, 'r', encoding='utf8') as csv_file:
-        table = csv.reader(csv_file, delimiter=separator)
-        data = list(table)
+        data = list(csv.reader(csv_file, delimiter=separator))
     return data
-    
 
-def download_data():
-    '''
+def download_data(browser: WebDriver) ->  list[list[str]]:
+    """
     Downloads the actual station data table and return it as a list.
-    '''
+    """
     data = browser.find_elements(By.XPATH, '//tbody/tr/td[1]')
     hora = browser.find_elements(By.XPATH, '//tbody/tr/td[2]')
     temp_inst = browser.find_elements(By.XPATH, '//tbody/tr/td[3]')
@@ -106,7 +104,7 @@ def download_data():
     #  Preparing data
     new_rows = []
     for i in range(len(hora)):
-        temp_data = [
+        new_rows.append([
             f'{data[i].text.split('/')[2]}-{data[i].text.split('/')[1]}-{data[i].text.split('/')[0]}',
             hora[i].text,
             temp_inst[i].text,
@@ -126,19 +124,17 @@ def download_data():
             vento_raj[i].text,
             radiacao[i].text,
             chuva[i].text
-        ]
-        new_rows.append(temp_data)
+        ])
     return new_rows
 
 def backup_tables() -> None:
-    '''
+    """
     Copy all .csv files to a backup folder. If this folder doesn't exists, it will be created.
-    '''
+    """
     if not os.path.exists('./backup'): os.mkdir('./backup')
-    #Create a backup folder named with actual date
-    backup_folder = f'./backup/{today}'
+    # Create a backup folder named with actual date
+    backup_folder = f'./backup/{TODAY}'
     if not os.path.exists(backup_folder): os.mkdir(backup_folder)
-
     #Get the file names in the folder
     files = os.listdir()
     #Copy all csv files to the backup folder
@@ -146,77 +142,78 @@ def backup_tables() -> None:
         if '.csv' in file and 'TEMP' not in file:
             shutil.copy2(f'./{file}', f'{backup_folder}/{file}')
 
-def write_new_csv(table_name: str, old_table: list):
-    '''
+def update_csv(table_name: str, old_table: list, new_rows: list) -> None:
+    """
     NEED TO CREATE: DOCUMENTATION 
-    '''
-    shutil.copyfile(table_name, f'TEMP{table_name}')
+    """
+    shutil.copyfile(table_name, f'TEMP{table_name}');
+    logger.log(f"updating table {table_name}")
     try:
-        with open(f'TEMP{table_name}', 'w', encoding='utf8', newline='') as tabela_csv:
-            tabela = csv.writer(tabela_csv, delimiter=';')
-            if today == old_table[-1][0]:
+        with open(f'TEMP{table_name}', 'w', encoding='utf8', newline='') as csv_table:
+            table = csv.writer(csv_table, delimiter=';')
+            if TODAY == old_table[-1][0]:
                 old_table = old_table[0:-24]
             else:
-                print('First register today')
+                logger.log('First register today')
                 #If it is the first register the day and its the first station, create backup
                 if verify_actual_station(stations[table_name[:-4]]) == [True, False]:
                     backup_tables()
-
-            tabela.writerows(old_table)
-            tabela.writerows(new_rows)
+            table.writerows(old_table)
+            table.writerows(new_rows)
         os.remove(table_name)
         os.rename(f'TEMP{table_name}', table_name)
-        print(f'{table_name} DATA SUCCESFULLY UPDATED!')
-    except:
+        logger.log(f'{table_name} DATA SUCCESSFULLY UPDATED!')
+    except Exception as e:
         os.remove(f'TEMP{table_name}')
-        print(f'ERROR!!! FAILED TO WRITE NEW CSV FILE FOR {table_name}!!!')
+        logger.log(f'ERROR!!! FAILED TO WRITE NEW CSV FILE FOR {table_name}!!! \n Exception: {e}')
         # NEED TO CREATE: LOG FOR ERROR TO WRITE NEW CSV
 
+def create_csv(table_name: str, rows: list):
+    logger.log(f"creating table {table_name}")
+    with open(table_name, 'w', encoding='utf8', newline='') as tabela_csv:
+        csv.writer(tabela_csv, delimiter=';').writerows(rows)
+    logger.log(f'{table_name} DATA SUCCESSFULLY CREATED!')
 
 def verify_actual_station(actual_station: str) -> list:
-    '''
+    """
     Verify if the actual station is the first or last station. Returns a list with the status.
     The first element in the list is the first station status and the second is the last station status.
     :param actual_station: the code of actual station.
-    '''
+    """
     station_status = [False, False]
     first_key = list(stations)[0]
     first_station = stations[first_key]
     last_key = list(stations)[-1]
     last_station = stations[last_key]
-    
     if first_station == actual_station:
         station_status[0] = True
     if last_station == actual_station:
         station_status[1] = True 
     return station_status 
 
+def start():
+    logger.log("Starting INMET scrapping")
+    browser = start_browser(show_browser=False)
+    for station in stations:
+        logger.log(f"Reading station {station} | code {stations[station]}")
+        browser.get(f'{BASE_URL}{stations[station]}/')
+        if not verify_data_availability(browser, stations[station], 10,20):
+            logger.log(f"Data unavailable for station {station}, skipping")
+            continue
+        station_csv_name = f'{station}.csv'
+        new_rows = download_data(browser)
+        old_table = []
+        file_exist = True
+        try:
+            old_table = read_table(station_csv_name, ';')  ### VERIFY ITERATION TO READ .CSV FILES
+        except FileNotFoundError:
+            logger.log(f"Table {station_csv_name} not found")
+            file_exist = False
+        if file_exist:
+            update_csv(f'{station_csv_name}', old_table, new_rows)
+            continue
+        create_csv(station_csv_name, new_rows)
+    browser.quit()
+    logger.log("INMET scraping finished")
 
-
-
-
-###############################################################
-#                      PRINCIPAL MODE                         #
-###############################################################
-
-
-today = datetime.today().strftime('%Y-%m-%d')
-
-parentLink = 'https://tempo.inmet.gov.br/TabelaEstacoes/'
-
-start_browser(show_browser = False)
-
-for station in stations:
-    getting_link(parentLink, stations[station])
-    if not verify_data_availability(10, 20):
-        # NEED TO CREATE: LOG FOR UNAVAILABLE DATA IN THE DAY 
-        continue
-    
-    stationCsvName = f'{station}.csv'
-    new_rows = download_data()
-    old_table = read_table(f'{stationCsvName}', ';') ### VERIFY ITERATION TO READ .CSV FILES
-    write_new_csv(f'{stationCsvName}', old_table)
-    
-browser.quit()
-    
-
+start()
