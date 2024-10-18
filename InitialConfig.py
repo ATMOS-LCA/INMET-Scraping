@@ -12,7 +12,6 @@ def backup_tables() -> None:
     '''
     backup_folder = './initial_backup'
     if not os.path.exists(backup_folder): os.mkdir(backup_folder)
-
     #Get the file names in the folder
     files = os.listdir()
     #Copy all csv files to the backup folder
@@ -20,10 +19,7 @@ def backup_tables() -> None:
         if '.csv' in file: 
             shutil.copy2(f'./{file}', f'{backup_folder}/{file}')
 
-
-
 #Rename the files
-
 def organize_files():
     files = os.listdir()
     for station in stations:
@@ -124,7 +120,7 @@ def write_new_csv(table_name: str, old_table: list):
             tabela = csv.writer(tabela_csv, delimiter=';')
             old_table = old_table[10:-1]
             tabela.writerows(old_table)
-        os.remove(table_name)
+        os.remove(table_name)   
         os.rename(f'TEMP{table_name}', table_name)
         print(f'{table_name} DATA SUCCESFULLY UPDATED!')
     except:
