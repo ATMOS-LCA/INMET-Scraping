@@ -17,6 +17,7 @@ O objetivo deste projeto é coletar dados meteorológicos em tempo real do site 
 
 ## Related links
 
+
 * [Portal do INMET](https://portal.inmet.gov.br/)
 * [Catálogo de Estações Automáticas do INMET](https://portal.inmet.gov.br/paginas/catalogoaut)
 * [Catálogo de Estações Convencionais do INMET](https://portal.inmet.gov.br/paginas/catalogoman)
