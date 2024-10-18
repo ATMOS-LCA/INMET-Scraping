@@ -12,6 +12,8 @@ O objetivo deste projeto é coletar dados meteorológicos em tempo real do site 
 * `Selenium WebDriver`
 * `Pandas`
 
+
+
 ## Related links
 
 * [Portal do INMET](https://portal.inmet.gov.br/)
