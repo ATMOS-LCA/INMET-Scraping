@@ -9,6 +9,9 @@ publish: check-pyinstaller create-output-dir
 		SpiderINMET.py
 	@echo "Copying config file to output directory..."
 	cp config.json $(OUTPUT_DIR)/
+	rm -rf build/
+	rm -rf __pycache__/
+	rm -rf *.spec
 
 check-pyinstaller:
 	@which pyinstaller > /dev/null 2>&1 || $(MAKE) install-pyinstaller
@@ -25,6 +28,5 @@ clean:
 	rm -rf build/
 	rm -rf __pycache__/
 	rm -rf *.spec
-	rm -rf $(OUTPUT_DIR)/
 
 .PHONY: publish check-pyinstaller install-pyinstaller create-output-dir clean
