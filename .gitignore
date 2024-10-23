@@ -1,1 +1,8 @@
 __pycache__
+*.csv
+.idea
+build/
+dist/
+backup/
+initial_backup/
+out/
