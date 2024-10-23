@@ -1,5 +1,4 @@
 from selenium import webdriver
-from selenium.common import NoSuchElementException
 from selenium.webdriver.ie.webdriver import WebDriver
 from webdriver_manager.firefox import GeckoDriverManager
 from selenium.webdriver.firefox.service import Service
@@ -9,13 +8,15 @@ from Logger import Logger
 import time
 from datetime import datetime
 import csv
-from stations import stations
 import os
 import shutil
+from rank_columns import generate_top
+from config import get_config
 
 TODAY = datetime.today().strftime('%Y-%m-%d')
-BASE_URL = 'https://tempo.inmet.gov.br/TabelaEstacoes/'
+CONFIG = get_config()
 logger = Logger()
+
 
 def start_browser(show_browser: bool = False) -> WebDriver:
     '''
@@ -46,18 +47,18 @@ def verify_data_availability(browser: WebDriver, station: str, get_link_again: i
         try:
             value = browser.find_element(By.XPATH, element_to_verify).is_displayed()
             logger.log(f'Data available in {count + 1} attempt! Keep going!')
-        except NoSuchElementException:
+        except Exception:
             logger.log(f'{count} attempt: Data still is unavailable. Trying again...')
             time.sleep(1)
             if count == get_link_again:
-                browser.get(f'{BASE_URL}{station}/')
+                browser.get(f'{CONFIG['scrap_url']}{station}/')
             elif count == limit_attempts:
                 logger.log(f'Retry limit exceeded')
                 break
             count += 1
     return value
 
-def read_table(table_name: str, separator: str = ',') -> list:
+def read_table(table_name: str) -> list:
     """
     receives a .csv file name and its delimiter, in current directory
     and return this file as a list.
@@ -67,7 +68,7 @@ def read_table(table_name: str, separator: str = ',') -> list:
     logger.log(f"Reading table {table_name}")
     data = []
     with open(table_name, 'r', encoding='utf8') as csv_file:
-        data = list(csv.reader(csv_file, delimiter=separator))
+        data = list(csv.reader(csv_file, delimiter=CONFIG['csv_delimiter']))
     return data
 
 def download_data(browser: WebDriver) ->  list[list[str]]:
@@ -123,47 +124,47 @@ def backup_tables() -> None:
     """
     Copy all .csv files to a backup folder. If this folder doesn't exists, it will be created.
     """
-    if not os.path.exists('./backup'): os.mkdir('./backup')
+    if not os.path.exists(f'{CONFIG.output_location}/backup'): os.mkdir(f'{CONFIG.output_location}/backup')
     # Create a backup folder named with actual date
-    backup_folder = f'./backup/{TODAY}'
+    backup_folder = f'{CONFIG.output_location}/backup/{TODAY}'
     if not os.path.exists(backup_folder): os.mkdir(backup_folder)
     #Get the file names in the folder
-    files = os.listdir()
+    files = os.listdir(path=CONFIG.output_location)
     #Copy all csv files to the backup folder
     for file in files:
         if '.csv' in file and 'TEMP' not in file:
-            shutil.copy2(f'./{file}', f'{backup_folder}/{file}')
+            shutil.copy2(f'{CONFIG.output_location}/{file}', f'{backup_folder}/{file}')
 
 def update_csv(table_name: str, old_table: list, new_rows: list) -> None:
     """
     NEED TO CREATE: DOCUMENTATION 
     """
-    shutil.copyfile(table_name, f'TEMP{table_name}');
+    shutil.copyfile(f"{CONFIG['output_location']}/table_name", f'{CONFIG['output_location']}/TEMP{table_name}')
     logger.log(f"updating table {table_name}")
     try:
-        with open(f'TEMP{table_name}', 'w', encoding='utf8', newline='') as csv_table:
-            table = csv.writer(csv_table, delimiter=';')
+        with open(f'{CONFIG['output_location']}/TEMP{table_name}', 'w', encoding='utf8', newline='') as csv_table:
+            table = csv.writer(csv_table, delimiter=CONFIG['csv_delimiter'])
             if TODAY == old_table[-1][0]:
                 old_table = old_table[0:-24]
             else:
                 logger.log('First register today')
                 #If it is the first register the day and its the first station, create backup
-                if verify_actual_station(stations[table_name[:-4]]) == [True, False]:
+                if verify_actual_station(CONFIG['stations'][table_name[:-4]]) == [True, False]:
                     backup_tables()
             table.writerows(old_table)
             table.writerows(new_rows)
         os.remove(table_name)
-        os.rename(f'TEMP{table_name}', table_name)
+        os.rename(f'{CONFIG['output_location']}/TEMP{table_name}', f"{CONFIG['output_location']}/{table_name}")
         logger.log(f'{table_name} DATA SUCCESSFULLY UPDATED!')
     except Exception as e:
-        os.remove(f'TEMP{table_name}')
+        os.remove(f'{CONFIG['output_location']}/TEMP{table_name}')
         logger.log(f'ERROR!!! FAILED TO WRITE NEW CSV FILE FOR {table_name}!!! \n Exception: {e}')
         # NEED TO CREATE: LOG FOR ERROR TO WRITE NEW CSV
 
 def create_csv(table_name: str, rows: list):
     logger.log(f"creating table {table_name}")
-    with open(table_name, 'w', encoding='utf8', newline='') as tabela_csv:
-        csv.writer(tabela_csv, delimiter=';').writerows(rows)
+    with open(f"{CONFIG['output_location']}/{table_name}", 'w', encoding='utf8', newline='') as tabela_csv:
+        csv.writer(tabela_csv, delimiter=CONFIG['csv_delimiter']).writerows(rows)
     logger.log(f'{table_name} DATA SUCCESSFULLY CREATED!')
 
 def verify_actual_station(actual_station: str) -> list:
@@ -173,10 +174,10 @@ def verify_actual_station(actual_station: str) -> list:
     :param actual_station: the code of actual station.
     """
     station_status = [False, False]
-    first_key = list(stations)[0]
-    first_station = stations[first_key]
-    last_key = list(stations)[-1]
-    last_station = stations[last_key]
+    first_key = list(CONFIG['stations'])[0]
+    first_station = CONFIG['stations'][first_key]
+    last_key = list(CONFIG['stations'])[-1]
+    last_station = CONFIG['stations'][last_key]
     if first_station == actual_station:
         station_status[0] = True
     if last_station == actual_station:
@@ -186,18 +187,21 @@ def verify_actual_station(actual_station: str) -> list:
 def start():
     logger.log("Starting INMET scrapping")
     browser = start_browser(show_browser=False)
-    for station in stations:
-        logger.log(f"Reading station {station} | code {stations[station]}")
-        browser.get(f'{BASE_URL}{stations[station]}/')
-        if not verify_data_availability(browser, stations[station], 10,20):
+    join = []
+    for station in CONFIG['stations']:
+        logger.log(f"Reading station {station} | code {CONFIG['stations'][station]}")
+        browser.get(f'{CONFIG['scrap_url']}{CONFIG['stations'][station]}/')
+        if not verify_data_availability(browser, CONFIG['stations'][station], CONFIG['scrap_link_retry'],CONFIG['scrap_rate_limit']):
             logger.log(f"Data unavailable for station {station}, skipping")
             continue
         station_csv_name = f'{station}.csv'
         new_rows = download_data(browser)
+        for new_row in new_rows:
+            join.append([CONFIG['stations'][station], station] + new_row)
         old_table = []
         file_exist = True
         try:
-            old_table = read_table(station_csv_name, ';')  ### VERIFY ITERATION TO READ .CSV FILES
+            old_table = read_table(station_csv_name)  ### VERIFY ITERATION TO READ .CSV FILES
         except FileNotFoundError:
             logger.log(f"Table {station_csv_name} not found")
             file_exist = False
@@ -207,5 +211,6 @@ def start():
         create_csv(station_csv_name, new_rows)
     browser.quit()
     logger.log("INMET scraping finished")
+    generate_top(join, CONFIG['top_size'], TODAY, CONFIG['output_location'])
 
 start()

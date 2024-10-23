@@ -1,4 +1,4 @@
-from stations import stations
+from constants import stations
 import shutil
 import os
 import csv
