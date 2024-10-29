@@ -2,6 +2,9 @@ import os
 import pandas as pd
 from pprint import pprint
 
+from pandas import DataFrame
+from pandas.core.groupby import DataFrameGroupBy
+
 HEADER = ['Cod. Estação', 'Nome Estação', 'Data', 'Hora', 'Temperatura Inst. (°C)', 'Temperatura Max. (°C)',
           'Temperatura Min. (°C)', 'Umidade Inst. (%)', 'Umidade Max. (%)', 'Umidade Min. (%)',
           'Pto. Orvalho Inst. (°C)', 'Pto. Orvalho Max. (°C)', 'Pto. Orvalho Min. (°C)', 'Pressão Inst. (hPa)',
@@ -11,34 +14,18 @@ HEADER = ['Cod. Estação', 'Nome Estação', 'Data', 'Hora', 'Temperatura Inst.
 def generate_top(data: list[list[str]], size: int, date: str, output_path: str) -> None:
     BASE_PATH = f"{output_path}/ranks/{date}"
     if not os.path.exists(BASE_PATH): os.makedirs(BASE_PATH)
-    df = pd.DataFrame(data, columns=HEADER)
-    pprint(df)
-    grouped = df.groupby('Cod. Estação')
-    max_temp = grouped['Temperatura Inst. (°C)'].max().reset_index()
-    max_temp = max_temp.sort_values(by='Temperatura Inst. (°C)', ascending=False).reset_index()
-    max_temp = max_temp.drop(columns='index')
-    max_temp = max_temp.head(size)
-    max_temp.replace('', '-')
-    max_temp.to_csv(f'{BASE_PATH}/top{size}_temperatura_maxima.csv')
-    pprint(max_temp)
-    min_temp = grouped['Temperatura Inst. (°C)'].min().reset_index()
-    min_temp = min_temp.sort_values(by='Temperatura Inst. (°C)', ascending=True).reset_index()
-    min_temp = min_temp.drop(columns='index')
-    min_temp = min_temp.head(size)
-    min_temp.replace('', '-')
-    min_temp.to_csv(f'{BASE_PATH}/top{size}_temperatura_minima.csv')
-    pprint(min_temp)
-    umid = grouped['Umidade Inst. (%)'].min().reset_index()
-    umid = umid.sort_values(by='Umidade Inst. (%)', ascending=True).reset_index()
-    umid = umid.drop(columns='index')
-    umid = umid.head(size)
-    umid = pd.DataFrame(umid)
-    umid.to_csv(f'{BASE_PATH}/top{size}_umidade_relativa.csv')
-    pprint(umid)
-    precip = grouped['Precipitação (mm)'].max().reset_index()
-    precip = precip.sort_values(by='Precipitação (mm)', ascending=False).reset_index()
-    precip = precip.drop(columns='index')
-    precip = precip.head(size)
-    precip.replace('', '-')
-    precip.to_csv(f'{BASE_PATH}/top{size}_precipitacao.csv')
-    pprint(precip)
+    grouped = pd.DataFrame(data, columns=HEADER).replace('', None).dropna().groupby('Cod. Estação')
+    rank_column(grouped, 'Temperatura Inst. (°C)', False, size, BASE_PATH, 'temperatura_maxima')
+    rank_column(grouped, 'Temperatura Inst. (°C)', True, size, BASE_PATH, 'temperatura_minima', 'min')
+    rank_column(grouped, 'Umidade Inst. (%)', False, size, BASE_PATH, 'umidade_relativa', 'min')
+    rank_column(grouped, 'Precipitação (mm)', False, size, BASE_PATH, 'precipitacao')
+
+
+def rank_column(groupedData: DataFrameGroupBy, target_column: str, ascending: bool, size: int, output_path: str,
+                name: str, method: str = 'max') -> None:
+    ((groupedData[target_column].max().reset_index() if method == 'max' else groupedData[target_column]
+      .min()
+      .reset_index())
+     .sort_values(by=target_column, ascending=ascending)
+     .head(size)
+     .to_csv(f'{output_path}/top{size}_{name}.csv'))
