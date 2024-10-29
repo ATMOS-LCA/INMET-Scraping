@@ -1,5 +1,5 @@
 {
-  "output_location": ".",
+  "output_location": "./data",
   "scrap_url": "https://tempo.inmet.gov.br/TabelaEstacoes/",
   "top_size": 12,
   "scrap_rate_limit": 20,
