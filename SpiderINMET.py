@@ -139,7 +139,7 @@ def update_csv(table_name: str, old_table: list, new_rows: list) -> None:
     """
     NEED TO CREATE: DOCUMENTATION 
     """
-    shutil.copyfile(f"{CONFIG['output_location']}/table_name", f'{CONFIG['output_location']}/TEMP{table_name}')
+    shutil.copyfile(f"{CONFIG['output_location']}/{table_name}", f'{CONFIG['output_location']}/TEMP{table_name}')
     logger.log(f"updating table {table_name}")
     try:
         with open(f'{CONFIG['output_location']}/TEMP{table_name}', 'w', encoding='utf8', newline='') as csv_table:
