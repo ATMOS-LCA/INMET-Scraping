@@ -6,14 +6,14 @@ from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.common.by import By
 from Logger import Logger
 import time
-from datetime import datetime
+from datetime import datetime, UTC
 import csv
 import os
 import shutil
 from rank_columns import generate_top
 from config import get_config
 
-TODAY = datetime.today().strftime('%Y-%m-%d')
+TODAY = datetime.now(UTC).strftime('%Y-%m-%d')
 CONFIG = get_config()
 logger = Logger()
 
