@@ -19,10 +19,10 @@ logger = Logger()
 
 
 def start_browser(show_browser: bool = False) -> WebDriver:
-    '''
-    This function only starts the browser.
-    :param show_browser: a boolean, True for the browser be showed, False for hide it.
-    '''
+    """
+    Inicia o navegador web
+    :param show_browser: define se o navegador será exibido, por padrão é ocultado.
+    """
     logger.log("Starting WebDriver")
     service = Service(GeckoDriverManager().install())
     firefox_options = Options()
@@ -33,11 +33,11 @@ def start_browser(show_browser: bool = False) -> WebDriver:
 
 def verify_data_availability(browser: WebDriver, station: str, get_link_again: int, limit_attempts: int) -> bool:
     """
-    Verify if the data is available to be downloaded.
-    :param browser: navigator webdriver
-    :param station: station to be verified
-    :param get_link_again: time, in seconds to wait before try to access link again.
-    :param limit_attempts: number limit of tries to access the link.
+    Verifica se há informações para consumir
+    :param browser: Webdriver, interface de navegador web
+    :param station: Estação a ser verificada
+    :param get_link_again: Quantidade de tentativas até consultar a pagina novamente
+    :param limit_attempts: Numero de tentativas
     """
     value = False
     element_to_verify = '//thead/tr[1]/th[1]'
@@ -47,7 +47,7 @@ def verify_data_availability(browser: WebDriver, station: str, get_link_again: i
         try:
             value = browser.find_element(By.XPATH, element_to_verify).is_displayed()
             logger.log(f'Data available in {count + 1} attempt! Keep going!')
-        except Exception:
+        except:
             logger.log(f'{count} attempt: Data still is unavailable. Trying again...')
             time.sleep(1)
             if count == get_link_again:
@@ -58,22 +58,19 @@ def verify_data_availability(browser: WebDriver, station: str, get_link_again: i
             count += 1
     return value
 
-def read_table(table_name: str) -> list:
+def read_table(file_name: str) -> list[list[str]]:
     """
-    receives a .csv file name and its delimiter, in current directory
-    and return this file as a list.
-    :param table_name: name of .csv file to be read.
-    :param separator: the separator of the .csv file. As default is the coma.
+    Lê arquivo na pasta de saída como csv
+    :param file_name: nome do arquivo na pasta de saída
     """
-    logger.log(f"Reading table {table_name}")
-    data = []
-    with open(table_name, 'r', encoding='utf8') as csv_file:
-        data = list(csv.reader(csv_file, delimiter=CONFIG['csv_delimiter']))
-    return data
+    logger.log(f"Reading table {file_name}")
+    with open(f'{CONFIG['output_location']}/{file_name}', 'r', encoding='utf8') as csv_file:
+        return list(csv.reader(csv_file, delimiter=CONFIG['csv_delimiter']))
 
 def download_data(browser: WebDriver) ->  list[list[str]]:
     """
-    Downloads the actual station data table and return it as a list.
+    Consome as informações da página da estação
+    :param browser: Webdriver, interface de navegador web
     """
     data = browser.find_elements(By.XPATH, '//tbody/tr/td[1]')
     hora = browser.find_elements(By.XPATH, '//tbody/tr/td[2]')
@@ -122,46 +119,49 @@ def download_data(browser: WebDriver) ->  list[list[str]]:
 
 def backup_tables() -> None:
     """
-    Copy all .csv files to a backup folder. If this folder doesn't exists, it will be created.
+    Copia todos os arquivos para uma pasta de backup
     """
-    if not os.path.exists(f'{CONFIG.output_location}/backup'): os.mkdir(f'{CONFIG.output_location}/backup')
-    # Create a backup folder named with actual date
-    backup_folder = f'{CONFIG.output_location}/backup/{TODAY}'
+    if not os.path.exists(f'{CONFIG['output_location']}/backup'): os.mkdir(f'{CONFIG['output_location']}/backup')
+    backup_folder = f'{CONFIG['output_location']}/backup/{TODAY}'
     if not os.path.exists(backup_folder): os.mkdir(backup_folder)
-    #Get the file names in the folder
-    files = os.listdir(path=CONFIG.output_location)
-    #Copy all csv files to the backup folder
+    files = os.listdir(path=CONFIG['output_location'])
     for file in files:
         if '.csv' in file and 'TEMP' not in file:
-            shutil.copy2(f'{CONFIG.output_location}/{file}', f'{backup_folder}/{file}')
+            shutil.copy2(f'{CONFIG['output_location']}/{file}', f'{backup_folder}/{file}')
 
-def update_csv(table_name: str, old_table: list, new_rows: list) -> None:
+def update_csv(table_name: str, old_table_rows: list[list[str]], new_rows: list[list[str]]) -> None:
     """
-    NEED TO CREATE: DOCUMENTATION 
+    Atualiza as informações na pasta dos arquivos já gerados para o dia atual
+    :param table_name: Nome do arquivo que deseja atualizar
+    :param old_table_rows: Dados do arquivo que deseja atualizar
+    :param new_rows: Novos dados que o arquivo alvo receberá
     """
     shutil.copyfile(f"{CONFIG['output_location']}/{table_name}", f'{CONFIG['output_location']}/TEMP{table_name}')
     logger.log(f"updating table {table_name}")
     try:
         with open(f'{CONFIG['output_location']}/TEMP{table_name}', 'w', encoding='utf8', newline='') as csv_table:
             table = csv.writer(csv_table, delimiter=CONFIG['csv_delimiter'])
-            if TODAY == old_table[-1][0]:
-                old_table = old_table[0:-24]
+            if TODAY == old_table_rows[-1][0]:
+                old_table_rows = old_table_rows[0:-24]
             else:
                 logger.log('First register today')
-                #If it is the first register the day and its the first station, create backup
                 if verify_actual_station(CONFIG['stations'][table_name[:-4]]) == [True, False]:
                     backup_tables()
-            table.writerows(old_table)
+            table.writerows(old_table_rows)
             table.writerows(new_rows)
-        os.remove(table_name)
+        os.remove(f"{CONFIG['output_location']}/{table_name}")
         os.rename(f'{CONFIG['output_location']}/TEMP{table_name}', f"{CONFIG['output_location']}/{table_name}")
         logger.log(f'{table_name} DATA SUCCESSFULLY UPDATED!')
     except Exception as e:
         os.remove(f'{CONFIG['output_location']}/TEMP{table_name}')
-        logger.log(f'ERROR!!! FAILED TO WRITE NEW CSV FILE FOR {table_name}!!! \n Exception: {e}')
-        # NEED TO CREATE: LOG FOR ERROR TO WRITE NEW CSV
+        logger.log(f'Exception thrown while trying to update table \n Exception: {e}')
 
-def create_csv(table_name: str, rows: list):
+def create_csv(table_name: str, rows: list[list[str]]):
+    """
+    Cria novo arquivo csv para preencher dados consumidos da página da estação
+    :param table_name: Nome do arquivo que será criado
+    :param rows: Matriz de dados que preencherá o arquivo criado
+    """
     logger.log(f"creating table {table_name}")
     with open(f"{CONFIG['output_location']}/{table_name}", 'w', encoding='utf8', newline='') as tabela_csv:
         csv.writer(tabela_csv, delimiter=CONFIG['csv_delimiter']).writerows(rows)
@@ -199,12 +199,11 @@ def start():
         for new_row in new_rows:
             join.append([CONFIG['stations'][station], station] + new_row)
         old_table = []
-        file_exist = True
+        file_exist = False
         try:
-            old_table = read_table(station_csv_name)  ### VERIFY ITERATION TO READ .CSV FILES
-        except FileNotFoundError:
-            logger.log(f"Table {station_csv_name} not found")
-            file_exist = False
+            old_table = read_table(station_csv_name)
+            file_exist = True
+        except FileNotFoundError: logger.log(f"Table {station_csv_name} not found")
         if file_exist:
             update_csv(f'{station_csv_name}', old_table, new_rows)
             continue

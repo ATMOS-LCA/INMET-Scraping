@@ -1,9 +1,10 @@
 import os
+
 import pandas as pd
-from pprint import pprint
 
 from pandas import DataFrame
 from pandas.core.groupby import DataFrameGroupBy
+
 
 HEADER = ['Cod. Estação', 'Nome Estação', 'Data', 'Hora', 'Temperatura Inst. (°C)', 'Temperatura Max. (°C)',
           'Temperatura Min. (°C)', 'Umidade Inst. (%)', 'Umidade Max. (%)', 'Umidade Min. (%)',
@@ -12,9 +13,17 @@ HEADER = ['Cod. Estação', 'Nome Estação', 'Data', 'Hora', 'Temperatura Inst.
           'Radiação (Kj/m²)', 'Precipitação (mm)']
 
 def generate_top(data: list[list[str]], size: int, date: str, output_path: str) -> None:
+    """
+    Raqueia as colunas Temperatura Inst. (°C), Umidade Inst. (%) e Precipitação (mm)  com dados de todas as estações
+    :param data: Matriz com dados de todas as estações
+    :param size: Tamanho do rank
+    :param date: Data do rank
+    :param output_path: Caminho base para os arquivos do rank
+    """
     BASE_PATH = f"{output_path}/ranks/{date}"
     if not os.path.exists(BASE_PATH): os.makedirs(BASE_PATH)
-    grouped = pd.DataFrame(data, columns=HEADER).replace('', None).dropna().groupby('Cod. Estação')
+    df = remove_none_rows(pd.DataFrame(data, columns=HEADER).replace('', None), ['Temperatura Inst. (°C)', 'Umidade Inst. (%)', 'Precipitação (mm)'])
+    grouped = df.groupby('Cod. Estação')
     rank_column(grouped, 'Temperatura Inst. (°C)', False, size, BASE_PATH, 'temperatura_maxima')
     rank_column(grouped, 'Temperatura Inst. (°C)', True, size, BASE_PATH, 'temperatura_minima', 'min')
     rank_column(grouped, 'Umidade Inst. (%)', False, size, BASE_PATH, 'umidade_relativa', 'min')
