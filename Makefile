@@ -1,4 +1,3 @@
-# Define default output directory
 OUTPUT_DIR := ./out
 BINARY_NAME := SpiderINMET
 
