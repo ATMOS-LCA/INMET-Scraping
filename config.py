@@ -40,6 +40,9 @@ DEFAULT_CONFIG = {
 }
 
 def get_config() -> dict:
+    """
+    Busca a configuração do script em $HOME/.config/inmet-scrap; caso não a encontre, irá criá-la neste caminho.
+    """
     home_path = os.environ.get("HOME") or os.environ.get("USERPROFILE")
     config_path = os.path.join(home_path, '.config','inmet-scrap')
     if not os.path.exists(config_path): os.makedirs(config_path)
@@ -52,6 +55,11 @@ def get_config() -> dict:
     return config
 
 def create_config_file(config_path: str, home_path: str) -> dict:
+    """
+    Cria configuração no caminho definido nos parametros, definindo por padrão o caminho de saída como $HOME/inmet-data
+    :param config_path: Caminho da configuração, sendo ele sempre $HOME/.config/inmet-scrap
+    :param home_path: Pasta home do computador onde está rodando
+    """
     output_default_path = os.path.join(home_path, 'inmet-data')
     if not os.path.exists(output_default_path): os.makedirs(output_default_path)
     DEFAULT_CONFIG['output_location'] = output_default_path
