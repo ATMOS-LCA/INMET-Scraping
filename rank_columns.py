@@ -32,9 +32,34 @@ def generate_top(data: list[list[str]], size: int, date: str, output_path: str) 
 
 def rank_column(groupedData: DataFrameGroupBy, target_column: str, ascending: bool, size: int, output_path: str,
                 name: str, method: str = 'max') -> None:
+    """
+    Ranqueia coluna e cria um arquivo para os dados resultantes
+    :param groupedData: Dados das estações agrupados pelo código da estação
+    :param target_column: Coluna sob a qual o rank será gerado
+    :param ascending: Define se a ordenação será ascendente ou descendente
+    :param size: Tamanho do rank
+    :param output_path: Caminho em que o arquivo do rank será criado
+    """
     ((groupedData[target_column].max().reset_index() if method == 'max' else groupedData[target_column]
       .min()
       .reset_index())
      .sort_values(by=target_column, ascending=ascending)
      .head(size)
      .to_csv(f'{output_path}/top{size}_{name}.csv'))
+
+
+def remove_none_rows(dataFrame: DataFrame, columns: list[str]):
+    """
+    Limpa todas as linhas onde as determinadas colunas estão vazias
+    :param dataFrame: Estrutura com os dados 
+    :param columns: Colunas a serem avaliadas
+    """
+    dataFrame_cleaned = dataFrame.replace('', None).copy()
+    missing_cols = [col for col in columns if col not in dataFrame_cleaned.columns]
+    if missing_cols:
+        raise ValueError(f"Missing columns in DataFrame: {missing_cols}")
+    mask = dataFrame[columns].notna().all(axis=1)
+    dataFrame_cleaned = dataFrame_cleaned[mask]
+    if len(dataFrame_cleaned) < len(dataFrame):
+        dataFrame_cleaned = dataFrame_cleaned.reset_index(drop=True)
+    return dataFrame_cleaned
