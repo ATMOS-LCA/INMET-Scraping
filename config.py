@@ -8,6 +8,11 @@ DEFAULT_CONFIG = {
   "scrap_rate_limit": 20,
   "scrap_link_retry": 10,
   "csv_delimiter": ";",
+  "db_host": "localhost",
+  "db_port": 3306,
+  "db_user": "user",
+  "db_password": "123456",
+  "db_database": "inmet",
   "stations": {
     "agua clara":"A756",
     "amambai":"A750",

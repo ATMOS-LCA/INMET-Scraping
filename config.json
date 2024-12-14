@@ -1,10 +1,14 @@
 {
-  "output_location": "./data",
+  "output_location": "/home/alanlopes/dev/INMET-Scraping/data",
   "scrap_url": "https://tempo.inmet.gov.br/TabelaEstacoes/",
   "top_size": 12,
   "scrap_rate_limit": 20,
   "scrap_link_retry": 10,
   "csv_delimiter": ";",
+  "db_host": "localhost",
+  "db_user": "root",
+  "db_password": "123456",
+  "db_database": "inmet",
   "stations": {
     "agua clara":"A756",
     "amambai":"A750",
