@@ -11,12 +11,37 @@ import csv
 import os
 import shutil
 from rank_columns import generate_top
+from mysql import connector
+from mysql.connector.pooling import PooledMySQLConnection
+from mysql.connector.abstracts import MySQLConnectionAbstract
 from config import get_config
+from typing import Union
+from decimal import Decimal
 
 TODAY = datetime.now(UTC).strftime('%Y-%m-%d')
 CONFIG = get_config()
 logger = Logger()
 
+INSERT_DADO_INMET = """
+INSERT INTO inmet.dados_estacoes (estacao, data, utc, temperatura, umidade, pto_orvalho, pressao, vento, radiacao, chuva)
+    VALUE (%(estacao)s, str_to_date(%(data)s, '%Y-%m-%d'), %(utc)s, %(temperatura)s, %(umidade)s, %(pto_orvalho)s, %(pressao)s, %(vento)s, %(radiacao)s, %(chuva)s)
+    ON DUPLICATE KEY UPDATE
+                        temperatura = %(temperatura)s,
+                        umidade     = %(umidade)s,
+                        pto_orvalho = %(pto_orvalho)s,
+                        pressao     = %(pressao)s,
+                        vento       = %(vento)s,
+                        radiacao    = %(radiacao)s,
+                        chuva       = %(chuva)s;
+"""
+
+def get_db_connection() -> Union[PooledMySQLConnection, MySQLConnectionAbstract]:
+    return connector.connect(
+        host=CONFIG["db_host"],
+        user=CONFIG["db_user"],
+        password=CONFIG["db_password"],
+        buffered=True,
+    )
 
 def start_browser(show_browser: bool = False) -> WebDriver:
     """
@@ -67,7 +92,12 @@ def read_table(file_name: str) -> list[list[str]]:
     with open(f'{CONFIG['output_location']}/{file_name}', 'r', encoding='utf8') as csv_file:
         return list(csv.reader(csv_file, delimiter=CONFIG['csv_delimiter']))
 
-def download_data(browser: WebDriver) ->  list[list[str]]:
+def sanitize_scrap_number(value: str) -> str | Decimal | None:
+    if len(value) == 0: return None;
+    return Decimal(value.replace(',', '.'))
+
+
+def download_data(browser: WebDriver, station: str) ->  list[dict[str, str | Decimal | None]]:
     """
     Consome as informações da página da estação
     :param browser: Webdriver, interface de navegador web
@@ -93,28 +123,20 @@ def download_data(browser: WebDriver) ->  list[list[str]]:
     chuva = browser.find_elements(By.XPATH, '//tbody/tr/td[19]')
     #  Preparing data
     new_rows = []
+
     for i in range(len(hora)):
-        new_rows.append([
-            f'{data[i].text.split('/')[2]}-{data[i].text.split('/')[1]}-{data[i].text.split('/')[0]}',
-            hora[i].text,
-            temp_inst[i].text,
-            temp_max[i].text,
-            temp_min[i].text,
-            umidade_inst[i].text,
-            umidade_max[i].text,
-            umidade_min[i].text,
-            pto_orvalho_inst[i].text,
-            pto_orvalho_max[i].text,
-            pto_orvalho_min[i].text,
-            pressao_inst[i].text,
-            pressao_max[i].text,
-            pressao_min[i].text,
-            vento_vel[i].text,
-            vento_dir[i].text,
-            vento_raj[i].text,
-            radiacao[i].text,
-            chuva[i].text
-        ])
+        new_rows.append({
+                'estacao': station,
+                'data': f'{data[i].text.split('/')[2]}-{data[i].text.split('/')[1]}-{data[i].text.split('/')[0]}',
+                'utc': hora[i].text,
+                'temperatura': sanitize_scrap_number(str(temp_inst[i].text)),
+                'umidade': sanitize_scrap_number(str(umidade_inst[i].text)),
+                'pto_orvalho': sanitize_scrap_number(str(pto_orvalho_inst[i].text)),
+                'pressao': sanitize_scrap_number(str(pressao_inst[i].text)),
+                'vento': sanitize_scrap_number(str(vento_vel[i].text)),
+                'radiacao': sanitize_scrap_number(str(radiacao[i].text)),
+                'chuva': sanitize_scrap_number(str(chuva[i].text)),
+            })
     return new_rows
 
 def backup_tables() -> None:
@@ -182,34 +204,32 @@ def verify_actual_station(actual_station: str) -> list:
         station_status[0] = True
     if last_station == actual_station:
         station_status[1] = True 
-    return station_status 
+    return station_status
+
+def insert_data_in_database(rows: list[dict[str,str]]):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    for row in rows:
+        cursor.execute(INSERT_DADO_INMET, row)
+    connection.commit()
+
 
 def start():
     logger.log("Starting INMET scrapping")
+    connection = get_db_connection()
     browser = start_browser(show_browser=False)
-    join = []
+    rows: list[dict[str, str | Decimal | None]] = []
     for station in CONFIG['stations']:
         logger.log(f"Reading station {station} | code {CONFIG['stations'][station]}")
         browser.get(f'{CONFIG['scrap_url']}{CONFIG['stations'][station]}/')
         if not verify_data_availability(browser, CONFIG['stations'][station], CONFIG['scrap_link_retry'],CONFIG['scrap_rate_limit']):
             logger.log(f"Data unavailable for station {station}, skipping")
             continue
-        station_csv_name = f'{station}.csv'
-        new_rows = download_data(browser)
-        for new_row in new_rows:
-            join.append([CONFIG['stations'][station], station] + new_row)
-        old_table = []
-        file_exist = False
-        try:
-            old_table = read_table(station_csv_name)
-            file_exist = True
-        except FileNotFoundError: logger.log(f"Table {station_csv_name} not found")
-        if file_exist:
-            update_csv(f'{station_csv_name}', old_table, new_rows)
-            continue
-        create_csv(station_csv_name, new_rows)
+        rows += download_data(browser, CONFIG['stations'][station]);
+    insert_data_in_database(rows)
     browser.quit()
     logger.log("INMET scraping finished")
-    generate_top(join, CONFIG['top_size'], TODAY, CONFIG['output_location'])
+
+
 
 start()
