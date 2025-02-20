@@ -9,7 +9,7 @@ DEFAULT_CONFIG = {
   "scrap_link_retry": 10,
   "csv_delimiter": ";",
   "db_host": "localhost",
-  "db_port": 3306,
+  "db_port": 5432,
   "db_user": "user",
   "db_password": "123456",
   "db_database": "inmet",

@@ -11,9 +11,8 @@ import csv
 import os
 import shutil
 from rank_columns import generate_top
-from mysql import connector
-from mysql.connector.pooling import PooledMySQLConnection
-from mysql.connector.abstracts import MySQLConnectionAbstract
+import psycopg2
+from psycopg2 import pool
 from config import get_config
 from typing import Union
 from decimal import Decimal
@@ -24,30 +23,22 @@ logger = Logger()
 
 INSERT_DADO_INMET = """
 INSERT INTO inmet.dados_estacoes (estacao, data, utc, temperatura, umidade, pto_orvalho, pressao, vento, radiacao, chuva)
-    VALUE (%(estacao)s, str_to_date(%(data)s, '%Y-%m-%d'), %(utc)s, %(temperatura)s, %(umidade)s, %(pto_orvalho)s, %(pressao)s, %(vento)s, %(radiacao)s, %(chuva)s)
-    ON DUPLICATE KEY UPDATE
-                        temperatura = %(temperatura)s,
-                        umidade     = %(umidade)s,
-                        pto_orvalho = %(pto_orvalho)s,
-                        pressao     = %(pressao)s,
-                        vento       = %(vento)s,
-                        radiacao    = %(radiacao)s,
-                        chuva       = %(chuva)s;
+VALUES (%(estacao)s, TO_DATE(%(data)s, 'YYYY-MM-DD'), %(utc)s, %(temperatura)s, %(umidade)s, %(pto_orvalho)s, %(pressao)s, %(vento)s, %(radiacao)s, %(chuva)s)
+ON CONFLICT (estacao, data, utc) 
+DO UPDATE SET
+    temperatura = %(temperatura)s,
+    umidade     = %(umidade)s,
+    pto_orvalho = %(pto_orvalho)s,
+    pressao     = %(pressao)s,
+    vento       = %(vento)s,
+    radiacao    = %(radiacao)s,
+    chuva       = %(chuva)s;
 """
 
-def get_db_connection() -> Union[PooledMySQLConnection, MySQLConnectionAbstract]:
-    return connector.connect(
-        host=CONFIG["db_host"],
-        user=CONFIG["db_user"],
-        password=CONFIG["db_password"],
-        buffered=True,
-    )
+def get_db_connection():
+    return psycopg2.connect(f"dbname={CONFIG["db_database"]} user={CONFIG["db_user"]} password={CONFIG["db_password"]} host={CONFIG["db_host"]} port={CONFIG["db_port"]}")
 
 def start_browser(show_browser: bool = False) -> WebDriver:
-    """
-    Inicia o navegador web
-    :param show_browser: define se o navegador será exibido, por padrão é ocultado.
-    """
     logger.log("Starting WebDriver")
     service = Service(GeckoDriverManager().install())
     firefox_options = Options()
@@ -57,13 +48,6 @@ def start_browser(show_browser: bool = False) -> WebDriver:
     return webdriver.Firefox(service=service, options=firefox_options)
 
 def verify_data_availability(browser: WebDriver, station: str, get_link_again: int, limit_attempts: int) -> bool:
-    """
-    Verifica se há informações para consumir
-    :param browser: Webdriver, interface de navegador web
-    :param station: Estação a ser verificada
-    :param get_link_again: Quantidade de tentativas até consultar a pagina novamente
-    :param limit_attempts: Numero de tentativas
-    """
     value = False
     element_to_verify = '//thead/tr[1]/th[1]'
     count = 0
@@ -76,7 +60,7 @@ def verify_data_availability(browser: WebDriver, station: str, get_link_again: i
             logger.log(f'{count} attempt: Data still is unavailable. Trying again...')
             time.sleep(1)
             if count == get_link_again:
-                browser.get(f'{CONFIG['scrap_url']}{station}/')
+                browser.get(f'{CONFIG["scrap_url"]}{station}/')
             elif count == limit_attempts:
                 logger.log(f'Retry limit exceeded')
                 break
@@ -84,24 +68,15 @@ def verify_data_availability(browser: WebDriver, station: str, get_link_again: i
     return value
 
 def read_table(file_name: str) -> list[list[str]]:
-    """
-    Lê arquivo na pasta de saída como csv
-    :param file_name: nome do arquivo na pasta de saída
-    """
     logger.log(f"Reading table {file_name}")
-    with open(f'{CONFIG['output_location']}/{file_name}', 'r', encoding='utf8') as csv_file:
+    with open(f'{CONFIG["output_location"]}/{file_name}', 'r', encoding='utf8') as csv_file:
         return list(csv.reader(csv_file, delimiter=CONFIG['csv_delimiter']))
 
 def sanitize_scrap_number(value: str) -> str | Decimal | None:
-    if len(value) == 0: return None;
+    if len(value) == 0: return None
     return Decimal(value.replace(',', '.'))
 
-
 def download_data(browser: WebDriver, station: str) ->  list[dict[str, str | Decimal | None]]:
-    """
-    Consome as informações da página da estação
-    :param browser: Webdriver, interface de navegador web
-    """
     data = browser.find_elements(By.XPATH, '//tbody/tr/td[1]')
     hora = browser.find_elements(By.XPATH, '//tbody/tr/td[2]')
     temp_inst = browser.find_elements(By.XPATH, '//tbody/tr/td[3]')
@@ -121,7 +96,6 @@ def download_data(browser: WebDriver, station: str) ->  list[dict[str, str | Dec
     vento_raj = browser.find_elements(By.XPATH, '//tbody/tr/td[17]')
     radiacao = browser.find_elements(By.XPATH, '//tbody/tr/td[18]')
     chuva = browser.find_elements(By.XPATH, '//tbody/tr/td[19]')
-    #  Preparing data
     new_rows = []
 
     for i in range(len(hora)):
@@ -140,24 +114,15 @@ def download_data(browser: WebDriver, station: str) ->  list[dict[str, str | Dec
     return new_rows
 
 def backup_tables() -> None:
-    """
-    Copia todos os arquivos para uma pasta de backup
-    """
-    if not os.path.exists(f'{CONFIG['output_location']}/backup'): os.mkdir(f'{CONFIG['output_location']}/backup')
-    backup_folder = f'{CONFIG['output_location']}/backup/{TODAY}'
+    if not os.path.exists(f'{CONFIG["output_location"]}/backup'): os.mkdir(f'{CONFIG["output_location"]}/backup')
+    backup_folder = f'{CONFIG["output_location"]}/backup/{TODAY}'
     if not os.path.exists(backup_folder): os.mkdir(backup_folder)
     files = os.listdir(path=CONFIG['output_location'])
     for file in files:
         if '.csv' in file and 'TEMP' not in file:
-            shutil.copy2(f'{CONFIG['output_location']}/{file}', f'{backup_folder}/{file}')
+            shutil.copy2(f'{CONFIG["output_location"]}/{file}', f'{backup_folder}/{file}')
 
 def update_csv(table_name: str, old_table_rows: list[list[str]], new_rows: list[list[str]]) -> None:
-    """
-    Atualiza as informações na pasta dos arquivos já gerados para o dia atual
-    :param table_name: Nome do arquivo que deseja atualizar
-    :param old_table_rows: Dados do arquivo que deseja atualizar
-    :param new_rows: Novos dados que o arquivo alvo receberá
-    """
     shutil.copyfile(f"{CONFIG['output_location']}/{table_name}", f'{CONFIG['output_location']}/TEMP{table_name}')
     logger.log(f"updating table {table_name}")
     try:
@@ -179,22 +144,12 @@ def update_csv(table_name: str, old_table_rows: list[list[str]], new_rows: list[
         logger.log(f'Exception thrown while trying to update table \n Exception: {e}')
 
 def create_csv(table_name: str, rows: list[list[str]]):
-    """
-    Cria novo arquivo csv para preencher dados consumidos da página da estação
-    :param table_name: Nome do arquivo que será criado
-    :param rows: Matriz de dados que preencherá o arquivo criado
-    """
     logger.log(f"creating table {table_name}")
     with open(f"{CONFIG['output_location']}/{table_name}", 'w', encoding='utf8', newline='') as tabela_csv:
         csv.writer(tabela_csv, delimiter=CONFIG['csv_delimiter']).writerows(rows)
     logger.log(f'{table_name} DATA SUCCESSFULLY CREATED!')
 
 def verify_actual_station(actual_station: str) -> list:
-    """
-    Verify if the actual station is the first or last station. Returns a list with the status.
-    The first element in the list is the first station status and the second is the last station status.
-    :param actual_station: the code of actual station.
-    """
     station_status = [False, False]
     first_key = list(CONFIG['stations'])[0]
     first_station = CONFIG['stations'][first_key]
@@ -203,20 +158,25 @@ def verify_actual_station(actual_station: str) -> list:
     if first_station == actual_station:
         station_status[0] = True
     if last_station == actual_station:
-        station_status[1] = True 
+        station_status[1] = True
     return station_status
 
 def insert_data_in_database(rows: list[dict[str,str]]):
-    connection = get_db_connection()
-    cursor = connection.cursor()
-    for row in rows:
-        cursor.execute(INSERT_DADO_INMET, row)
-    connection.commit()
-
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        for row in rows:
+            cursor.execute(INSERT_DADO_INMET, row)
+        conn.commit()
+    except Exception as e:
+        logger.log(f"Database error: {e}")
+    finally:
+        if conn:
+            conn.close()
 
 def start():
     logger.log("Starting INMET scrapping")
-    connection = get_db_connection()
     browser = start_browser(show_browser=False)
     rows: list[dict[str, str | Decimal | None]] = []
     for station in CONFIG['stations']:
@@ -225,11 +185,9 @@ def start():
         if not verify_data_availability(browser, CONFIG['stations'][station], CONFIG['scrap_link_retry'],CONFIG['scrap_rate_limit']):
             logger.log(f"Data unavailable for station {station}, skipping")
             continue
-        rows += download_data(browser, CONFIG['stations'][station]);
+        rows += download_data(browser, CONFIG['stations'][station])
     insert_data_in_database(rows)
     browser.quit()
     logger.log("INMET scraping finished")
-
-
 
 start()
