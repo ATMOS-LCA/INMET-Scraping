@@ -10,7 +10,6 @@ from datetime import datetime, UTC
 import csv
 import os
 import shutil
-from rank_columns import generate_top
 import psycopg2
 from psycopg2 import pool
 from config import get_config
@@ -36,7 +35,7 @@ DO UPDATE SET
 """
 
 def get_db_connection():
-    return psycopg2.connect(f"dbname={CONFIG["db_database"]} user={CONFIG["db_user"]} password={CONFIG["db_password"]} host={CONFIG["db_host"]} port={CONFIG["db_port"]}")
+    return psycopg2.connect("dbname=%s user=%s password=%s host=%s port=%s" % (CONFIG["db_database"], CONFIG["db_user"], CONFIG["db_password"], CONFIG["db_host"], CONFIG["db_port"]))
 
 def start_browser(show_browser: bool = False) -> WebDriver:
     logger.log("Starting WebDriver")
@@ -51,25 +50,25 @@ def verify_data_availability(browser: WebDriver, station: str, get_link_again: i
     value = False
     element_to_verify = '//thead/tr[1]/th[1]'
     count = 0
-    logger.log(f"Verifying data availability for station {station}")
+    logger.log("Verifying data availability for station %s" % (station))
     while not value:
         try:
             value = browser.find_element(By.XPATH, element_to_verify).is_displayed()
-            logger.log(f'Data available in {count + 1} attempt! Keep going!')
+            logger.log('Data available in %s attempt! Keep going!' % (count + 1))
         except:
-            logger.log(f'{count} attempt: Data still is unavailable. Trying again...')
+            logger.log('%s attempt: Data still is unavailable. Trying again...' % (count))
             time.sleep(1)
             if count == get_link_again:
-                browser.get(f'{CONFIG["scrap_url"]}{station}/')
+                browser.get('%s%s/' % (CONFIG["scrap_url"], station))
             elif count == limit_attempts:
-                logger.log(f'Retry limit exceeded')
+                logger.log('Retry limit exceeded')
                 break
             count += 1
     return value
 
 def read_table(file_name: str) -> list[list[str]]:
-    logger.log(f"Reading table {file_name}")
-    with open(f'{CONFIG["output_location"]}/{file_name}', 'r', encoding='utf8') as csv_file:
+    logger.log("Reading table %s" % (file_name))
+    with open('%s/%s' % (CONFIG["output_location"], file_name), 'r', encoding='utf8') as csv_file:
         return list(csv.reader(csv_file, delimiter=CONFIG['csv_delimiter']))
 
 def sanitize_scrap_number(value: str) -> str | Decimal | None:
@@ -101,7 +100,7 @@ def download_data(browser: WebDriver, station: str) ->  list[dict[str, str | Dec
     for i in range(len(hora)):
         new_rows.append({
                 'estacao': station,
-                'data': f'{data[i].text.split('/')[2]}-{data[i].text.split('/')[1]}-{data[i].text.split('/')[0]}',
+                'data': '%s-%s-%s' % (data[i].text.split('/')[2], data[i].text.split('/')[1], data[i].text.split('/')[0]),
                 'utc': hora[i].text,
                 'temperatura': sanitize_scrap_number(str(temp_inst[i].text)),
                 'umidade': sanitize_scrap_number(str(umidade_inst[i].text)),
@@ -114,19 +113,19 @@ def download_data(browser: WebDriver, station: str) ->  list[dict[str, str | Dec
     return new_rows
 
 def backup_tables() -> None:
-    if not os.path.exists(f'{CONFIG["output_location"]}/backup'): os.mkdir(f'{CONFIG["output_location"]}/backup')
-    backup_folder = f'{CONFIG["output_location"]}/backup/{TODAY}'
+    if not os.path.exists('%s/backup' % (CONFIG["output_location"])): os.mkdir('%s/backup' % (CONFIG["output_location"]))
+    backup_folder = '%s/backup/%s' % (CONFIG["output_location"], TODAY)
     if not os.path.exists(backup_folder): os.mkdir(backup_folder)
     files = os.listdir(path=CONFIG['output_location'])
     for file in files:
         if '.csv' in file and 'TEMP' not in file:
-            shutil.copy2(f'{CONFIG["output_location"]}/{file}', f'{backup_folder}/{file}')
+            shutil.copy2('%s/%s' % (CONFIG["output_location"], file), '%s/%s' % (backup_folder, file))
 
 def update_csv(table_name: str, old_table_rows: list[list[str]], new_rows: list[list[str]]) -> None:
-    shutil.copyfile(f"{CONFIG['output_location']}/{table_name}", f'{CONFIG['output_location']}/TEMP{table_name}')
-    logger.log(f"updating table {table_name}")
+    shutil.copyfile("%s/%s" % (CONFIG['output_location'], table_name), '%s/TEMP%s' % (CONFIG['output_location'], table_name))
+    logger.log("updating table %s" % (table_name))
     try:
-        with open(f'{CONFIG['output_location']}/TEMP{table_name}', 'w', encoding='utf8', newline='') as csv_table:
+        with open('%s/TEMP%s' % (CONFIG['output_location'], table_name), 'w', encoding='utf8', newline='') as csv_table:
             table = csv.writer(csv_table, delimiter=CONFIG['csv_delimiter'])
             if TODAY == old_table_rows[-1][0]:
                 old_table_rows = old_table_rows[0:-24]
@@ -136,18 +135,18 @@ def update_csv(table_name: str, old_table_rows: list[list[str]], new_rows: list[
                     backup_tables()
             table.writerows(old_table_rows)
             table.writerows(new_rows)
-        os.remove(f"{CONFIG['output_location']}/{table_name}")
-        os.rename(f'{CONFIG['output_location']}/TEMP{table_name}', f"{CONFIG['output_location']}/{table_name}")
-        logger.log(f'{table_name} DATA SUCCESSFULLY UPDATED!')
+        os.remove("%s/%s" % (CONFIG['output_location'], table_name))
+        os.rename('%s/TEMP%s' % (CONFIG['output_location'], table_name), "%s/%s" % (CONFIG['output_location'], table_name))
+        logger.log('%s DATA SUCCESSFULLY UPDATED!' % (table_name))
     except Exception as e:
-        os.remove(f'{CONFIG['output_location']}/TEMP{table_name}')
-        logger.log(f'Exception thrown while trying to update table \n Exception: {e}')
+        os.remove('%s/TEMP%s' % (CONFIG['output_location'], table_name))
+        logger.log('Exception thrown while trying to update table \n Exception: %s' % (e))
 
 def create_csv(table_name: str, rows: list[list[str]]):
-    logger.log(f"creating table {table_name}")
-    with open(f"{CONFIG['output_location']}/{table_name}", 'w', encoding='utf8', newline='') as tabela_csv:
+    logger.log("creating table %s" % (table_name))
+    with open("%s/%s" % (CONFIG['output_location'], table_name), 'w', encoding='utf8', newline='') as tabela_csv:
         csv.writer(tabela_csv, delimiter=CONFIG['csv_delimiter']).writerows(rows)
-    logger.log(f'{table_name} DATA SUCCESSFULLY CREATED!')
+    logger.log('%s DATA SUCCESSFULLY CREATED!' % (table_name))
 
 def verify_actual_station(actual_station: str) -> list:
     station_status = [False, False]
@@ -170,7 +169,7 @@ def insert_data_in_database(rows: list[dict[str,str]]):
             cursor.execute(INSERT_DADO_INMET, row)
         conn.commit()
     except Exception as e:
-        logger.log(f"Database error: {e}")
+        logger.log("Database error: %s" % (e))
     finally:
         if conn:
             conn.close()
@@ -180,12 +179,13 @@ def start():
     browser = start_browser(show_browser=False)
     rows: list[dict[str, str | Decimal | None]] = []
     for station in CONFIG['stations']:
-        logger.log(f"Reading station {station} | code {CONFIG['stations'][station]}")
-        browser.get(f'{CONFIG['scrap_url']}{CONFIG['stations'][station]}/')
+        logger.log("Reading station %s | code %s" % (station, CONFIG['stations'][station]))
+        browser.get('%s%s/' % (CONFIG['scrap_url'], CONFIG['stations'][station]))
         if not verify_data_availability(browser, CONFIG['stations'][station], CONFIG['scrap_link_retry'],CONFIG['scrap_rate_limit']):
-            logger.log(f"Data unavailable for station {station}, skipping")
+            logger.log("Data unavailable for station %s, skipping" % (station))
             continue
         rows += download_data(browser, CONFIG['stations'][station])
+        break;
     insert_data_in_database(rows)
     browser.quit()
     logger.log("INMET scraping finished")
