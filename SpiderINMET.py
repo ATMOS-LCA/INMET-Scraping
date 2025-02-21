@@ -185,7 +185,6 @@ def start():
             logger.log("Data unavailable for station %s, skipping" % (station))
             continue
         rows += download_data(browser, CONFIG['stations'][station])
-        break;
     insert_data_in_database(rows)
     browser.quit()
     logger.log("INMET scraping finished")
