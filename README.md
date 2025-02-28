@@ -39,6 +39,14 @@ Basicamente o programa principal segue os seguintes passos:
 
 ## Configurando o programa
 
+### Instalando dependências
+
+Para instalar os pacotes usados no programa, execute o seguinte comando na pasta do projeto:
+
+```bash
+pip install -r requirements.txt 
+```
+
 ### Configurações iniciais
 
 Primeiramente você deve ter em mente quais estações deseja coletar os dados em tempo real. Com as estações em mãos coloque-as no arquivo `stations.py` na forma 'nome da estação':'código da estação'.
