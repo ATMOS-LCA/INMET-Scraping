@@ -1,6 +1,6 @@
 from config import get_config
 from decimal import Decimal
-from mysql import connector
+import psycopg2
 import csv
 import os
 
@@ -27,7 +27,7 @@ def sanitize_scrap_number(value: str) -> str | Decimal | None:
     return Decimal(value.replace(',', '.'))
 
 def insert_data_in_database(rows: list[dict[str,str]]):
-    connection = connector.connect(
+    connection = psycopg2.connect(
         host=CONFIG["db_host"],
         user=CONFIG["db_user"],
         password=CONFIG["db_password"],
