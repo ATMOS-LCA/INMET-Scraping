@@ -21,8 +21,8 @@ CONFIG = get_config()
 logger = Logger()
 
 INSERT_DADO_INMET = """
-INSERT INTO inmet.dados_estacoes (estacao, data, utc, temperatura, umidade, pto_orvalho, pressao, vento, radiacao, chuva)
-VALUES (%(estacao)s, TO_DATE(%(data)s, 'YYYY-MM-DD'), %(utc)s, %(temperatura)s, %(umidade)s, %(pto_orvalho)s, %(pressao)s, %(vento)s, %(radiacao)s, %(chuva)s)
+INSERT INTO inmet.dados_estacoes (estacao, data, utc, temperatura, umidade, pto_orvalho, pressao, vento, vento_dir, vento_raj, radiacao, chuva)
+VALUES (%(estacao)s, TO_DATE(%(data)s, 'YYYY-MM-DD'), %(utc)s, %(temperatura)s, %(umidade)s, %(pto_orvalho)s, %(pressao)s, %(vento)s, %(vento_dir)s, %(vento_raj)s, %(radiacao)s, %(chuva)s)
 ON CONFLICT (estacao, data, utc) 
 DO UPDATE SET
     temperatura = %(temperatura)s,
@@ -30,6 +30,8 @@ DO UPDATE SET
     pto_orvalho = %(pto_orvalho)s,
     pressao     = %(pressao)s,
     vento       = %(vento)s,
+    vento_dir   = %(vento_dir)s,
+    vento_raj   = %(vento_raj)s,
     radiacao    = %(radiacao)s,
     chuva       = %(chuva)s;
 """
@@ -107,6 +109,8 @@ def download_data(browser: WebDriver, station: str) ->  list[dict[str, str | Dec
                 'pto_orvalho': sanitize_scrap_number(str(pto_orvalho_inst[i].text)),
                 'pressao': sanitize_scrap_number(str(pressao_inst[i].text)),
                 'vento': sanitize_scrap_number(str(vento_vel[i].text)),
+                'vento_dir': sanitize_scrap_number(str(vento_dir[i].text)),
+                'vento_raj': sanitize_scrap_number(str(vento_raj[i].text)),
                 'radiacao': sanitize_scrap_number(str(radiacao[i].text)),
                 'chuva': sanitize_scrap_number(str(chuva[i].text)),
             })

@@ -7,16 +7,19 @@ import os
 CONFIG = get_config()
 
 INSERT_DADO_INMET = """
-INSERT INTO inmet.dados_estacoes (estacao, data, utc, temperatura, umidade, pto_orvalho, pressao, vento, radiacao, chuva)
-    VALUE (%(estacao)s, str_to_date(%(data)s, '%Y-%m-%d'), %(utc)s, %(temperatura)s, %(umidade)s, %(pto_orvalho)s, %(pressao)s, %(vento)s, %(radiacao)s, %(chuva)s)
-    ON DUPLICATE KEY UPDATE
-                        temperatura = %(temperatura)s,
-                        umidade     = %(umidade)s,
-                        pto_orvalho = %(pto_orvalho)s,
-                        pressao     = %(pressao)s,
-                        vento       = %(vento)s,
-                        radiacao    = %(radiacao)s,
-                        chuva       = %(chuva)s;
+INSERT INTO inmet.dados_estacoes (estacao, data, utc, temperatura, umidade, pto_orvalho, pressao, vento, vento_dir, vento_raj, radiacao, chuva)
+VALUES (%(estacao)s, TO_DATE(%(data)s, 'YYYY-MM-DD'), %(utc)s, %(temperatura)s, %(umidade)s, %(pto_orvalho)s, %(pressao)s, %(vento)s, %(vento_dir)s, %(vento_raj)s, %(radiacao)s, %(chuva)s)
+ON CONFLICT (estacao, data, utc) 
+DO UPDATE SET
+    temperatura = %(temperatura)s,
+    umidade     = %(umidade)s,
+    pto_orvalho = %(pto_orvalho)s,
+    pressao     = %(pressao)s,
+    vento       = %(vento)s,
+    vento_dir   = %(vento_dir)s,
+    vento_raj   = %(vento_raj)s,
+    radiacao    = %(radiacao)s,
+    chuva       = %(chuva)s;
 """
 
 def sanitize_scrap_number(value: str) -> str | Decimal | None:
@@ -55,6 +58,8 @@ def start():
                 'pto_orvalho': sanitize_scrap_number(data[8]),
                 'pressao': sanitize_scrap_number(data[11]),
                 'vento': sanitize_scrap_number(data[14]),
+                'vento_dir': sanitize_scrap_number(data[15]),
+                'vento_raj': sanitize_scrap_number(data[16]),
                 'radiacao': sanitize_scrap_number(data[17]),
                 'chuva': sanitize_scrap_number(data[18]),
             })
@@ -63,11 +68,6 @@ def start():
     insert_data_in_database(params)
     print('Finished database insertion')
     print('Csv data imported')
-
-
-
-
-
 
 
 start()
