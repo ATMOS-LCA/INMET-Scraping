@@ -5,7 +5,7 @@ services:
       ports:
         - "4444:4444"
     inmet-scrap:
-      image: inmet_test
+      image: inmet_scrap
       build: 
         context: .
         dockerfile: Dockerfile
