@@ -27,12 +27,7 @@ def sanitize_scrap_number(value: str) -> str | Decimal | None:
     return Decimal(value.replace(',', '.'))
 
 def insert_data_in_database(rows: list[dict[str,str]]):
-    connection = psycopg2.connect(
-        host=CONFIG["db_host"],
-        user=CONFIG["db_user"],
-        password=CONFIG["db_password"],
-        buffered=True,
-    )
+    connection = psycopg2.connect("dbname=%s user=%s password=%s host=%s port=%s" % (CONFIG["db_database"], CONFIG["db_user"], CONFIG["db_password"], CONFIG["db_host"], CONFIG["db_port"]))
     cursor = connection.cursor()
     for row in rows:
         cursor.execute(INSERT_DADO_INMET, row)
@@ -48,9 +43,9 @@ def start():
         print(f'Importing {file} started')
         with open(os.path.join(CONFIG['output_location'], file)) as csv_file:
             csv_data = list(csv.reader(csv_file, delimiter=CONFIG['csv_delimiter']))
-        for data in csv_data:
+        for data in csv_data[1:]:
             params.append({
-                'estacao': CONFIG['stations'][file.replace('.csv', '')],
+                'estacao': CONFIG['stations'][file.replace('.csv', '')] if file != 'bela vista.csv' else 'A757',
                 'data': data[0],
                 'utc': data[1],
                 'temperatura': sanitize_scrap_number(data[2]),
