@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 RUN wget https://www.python.org/ftp/python/3.13.3/Python-3.13.3.tar.xz && \
-    tar -xvf Pythockern-3.13.3.tar.xz && \
+    tar -xvf Python-3.13.3.tar.xz && \
     cd Python-3.13.3 && \
     ./configure --enable-optimizations && \
     make altinstall && \
