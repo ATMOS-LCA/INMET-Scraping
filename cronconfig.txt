@@ -1,0 +1,1 @@
+30 * * * * /venv/bin/python /SpiderINMET__DOCKER.py >> /var/log/cron.log 2>&1

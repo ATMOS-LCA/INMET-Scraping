@@ -1,0 +1,20 @@
+services:
+    webdriver: 
+      image: selenium/standalone-firefox
+      restart: always
+      ports:
+        - "4444:4444"
+    inmet-scrap:
+      image: inmet_test
+      build: 
+        context: .
+        dockerfile: Dockerfile
+      restart: always
+      environment:
+        WEBDRIVER_HOST: 'http://webdriver:4444/wd/hub'
+        DB_HOST: '34.39.143.242'
+        DB_PORT: 5432
+        DB_USER: postgres
+        DB_DATABASE: postgres
+        DB_PASSWORD: atmos2025
+

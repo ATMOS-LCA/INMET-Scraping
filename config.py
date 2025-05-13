@@ -8,11 +8,11 @@ DEFAULT_CONFIG = {
   "scrap_rate_limit": 20,
   "scrap_link_retry": 10,
   "csv_delimiter": ";",
-  "db_host": "localhost",
+  "db_host": "34.39.143.242",
   "db_port": 5432,
-  "db_user": "user",
-  "db_password": "123456",
-  "db_database": "inmet",
+  "db_user": "postgres",
+  "db_password": "atmos2025",
+  "db_database": "postgres",
   "stations": {
     "agua clara":"A756",
     "amambai":"A750",
@@ -40,7 +40,21 @@ DEFAULT_CONFIG = {
     "sete quedas":"A751",
     "sidrolandia":"A754",
     "sonora":"A761",
-    "tres lagoas":"A704"
+    "tres lagoas":"A704",
+    "angelica": "S701",
+    "aral moreira": "S702",
+    "bandeirantes": "S703",
+    "bonito": "S704",
+    "caarapo": "S706",
+    "camapua": "S707",
+    "fatima do sul": "S708",
+    "iguatemi": "S709",
+    "Laguna Carapa": "S711",
+    "nova alvorada do sul": "S712",
+    "nova andradina": "S713",
+    "pedro gomes": "S714",
+    "Ribas do Rio Pardo": "S715",
+    "Santa Rita do Pardo": "S716"
   }
 }
 

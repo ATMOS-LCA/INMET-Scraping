@@ -1,9 +1,11 @@
 from selenium import webdriver
 from selenium.webdriver.ie.webdriver import WebDriver
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from webdriver_manager.firefox import GeckoDriverManager
 from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.wait import WebDriverWait
 from Logger import Logger
 import time
 from datetime import datetime, UTC
@@ -11,15 +13,68 @@ import csv
 import os
 import shutil
 import psycopg2
-from config import get_config
 from decimal import Decimal
 
 TODAY = datetime.now(UTC).strftime('%Y-%m-%d')
-CONFIG = get_config()
 logger = Logger()
+CONFIG = {
+  "scrap_url": "https://tempo.inmet.gov.br/TabelaEstacoes/",
+  "webdriver_url": os.environ['WEBDRIVER_HOST'],
+  "scrap_rate_limit": 20,
+  "scrap_link_retry": 10,
+  "csv_delimiter": ";",
+  "db_host": os.environ['DB_HOST'],
+  "db_port": os.environ['DB_PORT'],
+  "db_user": os.environ['DB_USER'],
+  "db_password": os.environ['DB_PASSWORD'],
+  "db_database": os.environ['DB_DATABASE'],
+  "stations": {
+    "agua clara":"A756",
+    "amambai":"A750",
+    "aquidauana":"A719",
+    "bataguassu":"A759",
+    "campo grande":"A702",
+    "cassilandia":"A742",
+    "chapadao do sul":"A730",
+    "corumba":"A724",
+    "costa rica":"A760",
+    "coxim":"A720",
+    "dourados":"A721",
+    "itaquirai":"A752",
+    "ivinhema":"A709",
+    "jardim":"A758",
+    "juti":"A749",
+    "maracaju":"A731",
+    "miranda":"A722",
+    "nhumirim":"A717",
+    "paranaiba":"A710",
+    "ponta pora":"A703",
+    "porto murtinho":"A723",
+    "rio brilhante":"A743",
+    "sao gabriel do oeste":"A732",
+    "sete quedas":"A751",
+    "sidrolandia":"A754",
+    "sonora":"A761",
+    "tres lagoas":"A704",
+    "angelica": "S701",
+    "aral moreira": "S702",
+    "bandeirantes": "S703",
+    "bonito": "S704",
+    "caarapo": "S706",
+    "camapua": "S707",
+    "fatima do sul": "S708",
+    "iguatemi": "S709",
+    "Laguna Carapa": "S711",
+    "nova alvorada do sul": "S712",
+    "nova andradina": "S713",
+    "pedro gomes": "S714",
+    "Ribas do Rio Pardo": "S715",
+    "Santa Rita do Pardo": "S716"
+  }
+}
 
 INSERT_DADO_INMET = """
-INSERT INTO inmet.dados_estacoes (estacao, data, utc, temperatura, umidade, pto_orvalho, pressao, vento, vento_dir, vento_raj, radiacao, chuva)
+INSERT INTO dados_estacoes (estacao, data, utc, temperatura, umidade, pto_orvalho, pressao, vento, vento_dir, vento_raj, radiacao, chuva)
 VALUES (%(estacao)s, TO_DATE(%(data)s, 'YYYY-MM-DD'), %(utc)s, %(temperatura)s, %(umidade)s, %(pto_orvalho)s, %(pressao)s, %(vento)s, %(vento_dir)s, %(vento_raj)s, %(radiacao)s, %(chuva)s)
 ON CONFLICT (estacao, data, utc) 
 DO UPDATE SET
@@ -39,12 +94,11 @@ def get_db_connection():
 
 def start_browser(show_browser: bool = False) -> WebDriver:
     logger.log("Starting WebDriver")
-    service = Service(GeckoDriverManager().install())
     firefox_options = Options()
     if not show_browser:
         firefox_options.add_argument('--headless')
     logger.log("WebDriver started")
-    return webdriver.Firefox(service=service, options=firefox_options)
+    return webdriver.Remote(CONFIG['webdriver_url'], DesiredCapabilities.FIREFOX, options=firefox_options)
 
 def verify_data_availability(browser: WebDriver, station: str, get_link_again: int, limit_attempts: int) -> bool:
     value = False
