@@ -51,5 +51,7 @@ RUN set -e; \
 RUN chmod 0644 /etc/cron.d/cronconfig && \
     crontab -u root /etc/cron.d/cronconfig && \
     touch /var/log/cron.log
+RUN apt update && apt install netcat-traditional && update-alternatives --config nc
 
-CMD ["sh", "-c", "cron && tail -f /var/log/cron.log"]
+CMD ["sh", "-c", "cron && (while true; do { echo -e 'HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n'; cat /cronconfig.txt; } | nc -l -p 8080 -q 1; done) & \
+    tail -f /var/log/cron.log & tail -f /var/log/cron.log"]
