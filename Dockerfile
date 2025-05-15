@@ -22,12 +22,22 @@ COPY SpiderINMET__DOCKER.py .
 COPY Logger.py .
 COPY requirements.txt .
 
-ENV WEBDRIVER_HOST='http://localhost:4444/wd/hub'
-ENV DB_HOST='34.39.143.242'
-ENV DB_PORT=5432
-ENV DB_USER=postgres
-ENV DB_DATABASE=postgres
-ENV DB_PASSWORD=atmos2025
+RUN /venv/bin/pip install --no-cache-dir -r requirements.txt
+
+
+ARG WEBDRIVER_HOST='http://localhost:4444/wd/hub'
+ARG DB_HOST='localhost'
+ARG DB_PORT=5432
+ARG DB_USER=postgres
+ARG DB_DATABASE=postgres
+ARG DB_PASSWORD=12345
+
+ENV WEBDRIVER_HOST=${WEBDRIVER_HOST}
+ENV DB_HOST=${DB_HOST}
+ENV DB_PORT=${DB_PORT}
+ENV DB_USER=${DB_USER}
+ENV DB_DATABASE=${DB_DATABASE}
+ENV DB_PASSWORD=${DB_PASSWORD}
 RUN set -e; \
     { \
       echo "WEBDRIVER_HOST=${WEBDRIVER_HOST}"; \
@@ -41,8 +51,5 @@ RUN set -e; \
 RUN chmod 0644 /etc/cron.d/cronconfig && \
     crontab -u root /etc/cron.d/cronconfig && \
     touch /var/log/cron.log
-
-
-RUN /venv/bin/pip install --no-cache-dir -r requirements.txt
 
 CMD ["sh", "-c", "cron && tail -f /var/log/cron.log"]
