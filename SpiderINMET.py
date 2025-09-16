@@ -19,14 +19,36 @@ CONFIG = get_config()
 logger = Logger()
 
 INSERT_DADO_INMET = """
-INSERT INTO inmet.dados_estacoes (estacao, data, utc, temperatura, umidade, pto_orvalho, pressao, vento, vento_dir, vento_raj, radiacao, chuva)
-VALUES (%(estacao)s, TO_DATE(%(data)s, 'YYYY-MM-DD'), %(utc)s, %(temperatura)s, %(umidade)s, %(pto_orvalho)s, %(pressao)s, %(vento)s, %(vento_dir)s, %(vento_raj)s, %(radiacao)s, %(chuva)s)
+INSERT INTO inmet.dados_estacoes (estacao, data, utc, temperatura, temperatura_min, temperatura_max, umidade, pto_orvalho, pressao, vento, vento_dir, vento_raj, radiacao, chuva)
+VALUES (
+    %(estacao)s,
+    TO_DATE(%(data)s, 'YYYY-MM-DD'),
+    %(utc)s,
+    %(temperatura)s,
+    %(temperatura_min)s,
+    %(temperatura_max)s,
+    %(umidade)s,
+    %(pto_orvalho)s,
+    %(pressao)s,
+    %(vento)s,
+    %(vento_dir)s,
+    %(vento_raj)s,
+    %(radiacao)s,
+    %(chuva)s)
 ON CONFLICT (estacao, data, utc) 
 DO UPDATE SET
     temperatura = %(temperatura)s,
+    temperatura_min = %(temperatura_min)s,
+    temperatura_max = %(temperatura_max)s,    
     umidade     = %(umidade)s,
+    umidade_min = %(umidade_min)s, 
+    umidade_max = %(umidade_max)s, 
     pto_orvalho = %(pto_orvalho)s,
+    pto_orvalho_max = %(pto_orvalho_max)s,
+    pto_orvalho_min = %(pto_orvalho_min)s,
     pressao     = %(pressao)s,
+    pressao_min = %(pressao_min)s,
+    pressao_max = %(pressao_max)s,
     vento       = %(vento)s,
     vento_dir   = %(vento_dir)s,
     vento_raj   = %(vento_raj)s,
@@ -103,9 +125,17 @@ def download_data(browser: WebDriver, station: str) ->  list[dict[str, str | Dec
                 'data': '%s-%s-%s' % (data[i].text.split('/')[2], data[i].text.split('/')[1], data[i].text.split('/')[0]),
                 'utc': hora[i].text,
                 'temperatura': sanitize_scrap_number(str(temp_inst[i].text)),
+                'temperatura_min': sanitize_scrap_number(str(temp_min[i].text)),
+                'temperatura_max': sanitize_scrap_number(str(temp_max[i].text)),
                 'umidade': sanitize_scrap_number(str(umidade_inst[i].text)),
+                'umidade_min': sanitize_scrap_number(str(umidade_min[i].text)),
+                'umidade_max': sanitize_scrap_number(str(umidade_max[i].text)),
                 'pto_orvalho': sanitize_scrap_number(str(pto_orvalho_inst[i].text)),
+                'pto_orvalho_min': sanitize_scrap_number(str(pto_orvalho_min[i].text)),
+                'pto_orvalho_max': sanitize_scrap_number(str(pto_orvalho_max[i].text)),
                 'pressao': sanitize_scrap_number(str(pressao_inst[i].text)),
+                'pressao_min': sanitize_scrap_number(str(pressao_min[i].text)),
+                'pressao_max': sanitize_scrap_number(str(pressao_max[i].text)),
                 'vento': sanitize_scrap_number(str(vento_vel[i].text)),
                 'vento_dir': sanitize_scrap_number(str(vento_dir[i].text)),
                 'vento_raj': sanitize_scrap_number(str(vento_raj[i].text)),
