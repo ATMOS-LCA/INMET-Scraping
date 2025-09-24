@@ -19,7 +19,7 @@ CONFIG = get_config()
 logger = Logger()
 
 INSERT_DADO_INMET = """
-INSERT INTO inmet.dados_estacoes (estacao, data, utc, temperatura, temperatura_min, temperatura_max, umidade, pto_orvalho, pressao, vento, vento_dir, vento_raj, radiacao, chuva)
+INSERT INTO inmet.dados_estacoes (estacao, data, utc, temperatura, temperatura_min, temperatura_max, umidade, umidade_min, umidade_max, pto_orvalho, pto_orvalho_min, pto_orvalho_max, pressao, pressao_min, pressao_max, vento, vento_dir, vento_raj, radiacao, chuva)
 VALUES (
     %(estacao)s,
     TO_DATE(%(data)s, 'YYYY-MM-DD'),
@@ -28,8 +28,14 @@ VALUES (
     %(temperatura_min)s,
     %(temperatura_max)s,
     %(umidade)s,
+    %(umidade_min)s,
+    %(umidade_max)s,
     %(pto_orvalho)s,
+    %(pto_orvalho_min)s,
+    %(pto_orvalho_max)s,
     %(pressao)s,
+    %(pressao_min)s,
+    %(pressao_max)s,
     %(vento)s,
     %(vento_dir)s,
     %(vento_raj)s,
@@ -201,6 +207,7 @@ def insert_data_in_database(rows: list[dict[str,str]]):
             cursor.execute(INSERT_DADO_INMET, row)
         conn.commit()
     except Exception as e:
+        print(rows)
         logger.log("Database error: %s" % (e))
     finally:
         if conn:
