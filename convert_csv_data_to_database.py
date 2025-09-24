@@ -98,12 +98,9 @@ def import_data_from_file(file: str):
 
 def start():
     print('Csv data import started')
-    files = filter(lambda x : x.endswith('.csv'), os.listdir(CONFIG['output_location']))
-    files = list(files)
-    cpu_count = os.cpu_count() or 1
-    workers = max(1, cpu_count // 2)
-    with Pool(workers) as pool:
-        pool.map(import_data_from_file, files)
+    files = list(filter(lambda x : x.endswith('.csv'), os.listdir(CONFIG['output_location'])))
+    for file in files:
+        import_data_from_file(file)        
     print('Starting database insertion')
     print('Finished database insertion')
     print('Csv data imported')
