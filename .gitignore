@@ -8,3 +8,5 @@ initial_backup/
 out/
 data*/
 .env
+*.log
+/logs
