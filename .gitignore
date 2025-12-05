@@ -7,3 +7,4 @@ backup/
 initial_backup/
 out/
 data*/
+.env
