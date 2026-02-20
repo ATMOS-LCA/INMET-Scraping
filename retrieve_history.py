@@ -5,8 +5,22 @@ import os
 import csv
 import psycopg2
 
+def read_csv(file_path: str, delimiter: str) -> list[list[str]]:
+    encodings = ['utf-8', 'iso-8859-1', 'cp1252', 'ascii']
+    
+    for encoding in encodings:
+        try:
+            with open(file_path, 'r', encoding=encoding) as file_csv:
+                return list(csv.reader(file_csv, delimiter=delimiter))
+        except UnicodeDecodeError:
+            continue
+        except Exception as e:
+            raise e
+    
+    raise UnicodeDecodeError('utf-8', b'', 0, 1, f'Could not decode file {file_path} with any of the attempted encodings: {encodings}')
+
 CONFIG = get_config()
-HIST_FILES_PATH = './data_old_test'
+HIST_FILES_PATH = './dados_historicos'
 DB_CONN = psycopg2.connect("dbname=%s user=%s password=%s host=%s port=%s" % (CONFIG["db_database"], CONFIG["db_user"], CONFIG["db_password"], CONFIG["db_host"], CONFIG["db_port"]))
 INSERT_DADO_INMET = """
 INSERT INTO inmet.dados_estacoes (estacao, data, utc, temperatura, temperatura_min, temperatura_max, umidade, umidade_min, umidade_max, pto_orvalho, pto_orvalho_min, pto_orvalho_max, pressao, pressao_min, pressao_max, vento, vento_dir, vento_raj, radiacao, chuva)
@@ -48,6 +62,7 @@ def test_connection():
     cursor.execute("SELECT 1;")
     DB_CONN.commit()
     cursor.close()
+    
 
 def start():
     logger.log('start retrieve of historic data')
@@ -61,8 +76,7 @@ def start():
         logger.log('reading data from %s' % (file))
         params : list[dict[str, str | Decimal | None]] = []
         csv_data : list[list[str]] = []
-        with open(os.path.join(HIST_FILES_PATH, file), 'r') as file_csv:
-            csv_data = list(csv.reader(file_csv, delimiter=CONFIG['csv_delimiter']))
+        csv_data = read_csv(os.path.join(HIST_FILES_PATH, file), CONFIG['csv_delimiter'])
         estacao = csv_data[3][1]
         csv_data = csv_data[9:]
         for data in csv_data:
